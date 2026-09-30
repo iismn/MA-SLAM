@@ -1,0 +1,154 @@
+# MA-SLAM ROS2 parameters for UrbanNav HK TST-20210517.
+# Transforms map a LiDAR point into the physical SPAN IMU frame (row-major).
+# Sensor 0 is the center HDL32 and remains the graph/map reference LiDAR.
+# For a two-LiDAR build: sensors.count=2 and estimator.point_filter_num=[1, 1].
+# The lidar2 section is then unused. Adjust absolute paths on another computer.
+/**:
+  ros__parameters:
+    use_sim_time: true
+
+    imu:
+      topic: /imu/data
+      # corrected timestamp = header timestamp + this offset (seconds).
+      time_offset_seconds: 0.0
+
+    synchronization:
+      pair_tolerance_seconds: 0.08
+      scan_queue_limit: 100
+      imu_queue_limit: 20000
+      # Original MA-LIO B-spline deskew requires 15 future IMU samples.
+
+    sensors:
+      count: 3
+      lidar0:
+        topic: /velodyne_points
+        frame_id: velodyne
+        timing_mode: measured
+        time_field: time
+        time_unit_seconds: 1.0
+        time_offset_seconds: 0.0
+        scan_duration_seconds: 0.1
+        header_is_end: false
+        lidar_to_imu: [1.0, 0.0, 0.0, 0.0,
+                       0.0, 1.0, 0.0, 0.0,
+                       0.0, 0.0, 1.0, 0.28,
+                       0.0, 0.0, 0.0, 1.0]
+      lidar1:
+        topic: /right/velodyne_points
+        frame_id: velodyne_right
+        timing_mode: measured
+        time_field: time
+        time_unit_seconds: 1.0
+        time_offset_seconds: 0.0
+        scan_duration_seconds: 0.1
+        header_is_end: false
+        lidar_to_imu: [0.566085, 0.0347042, 0.823616, 0.323744,
+                       -0.0296934, 0.999323, -0.0216991, -0.00124153,
+                       -0.823812, -0.0121725, 0.566732, 0.079124,
+                       0.0, 0.0, 0.0, 1.0]
+      lidar2:
+        topic: /left/lslidar_point_cloud
+        frame_id: laser_link
+        # This bag has no measured LS-C16 point-time field: estimate ring-sweep
+        # azimuth timing explicitly. This is an estimate, not a hardware timestamp.
+        # Set measured + the actual time_field/unit for bags that provide one.
+        # A real 20ms scan must use 0.02 here; it must never be stretched to 0.1.
+        timing_mode: azimuth_rings
+        time_field: time
+        time_unit_seconds: 1.0
+        time_offset_seconds: 0.0
+        scan_duration_seconds: 0.1
+        header_is_end: true
+        lidar_to_imu: [-0.00848239, -0.561875, -0.827179, -0.267094,
+                       0.999415, -0.0321631, 0.0115987, -0.000706537,
+                       -0.0331216, -0.826597, 0.561819, 0.055962,
+                       0.0, 0.0, 0.0, 1.0]
+
+    estimator:
+      max_iteration: 4
+      # These voxels affect scan matching and the internal local map only.
+      # Full PCD preserves accepted deskewed input points and measured intensity;
+      # invalid/blind/strided points and points outside spline support are omitted.
+      filter_size_surf: 0.5
+      filter_size_map: 0.5
+      cube_side_length: 200.0
+      det_range: 100.0
+      plane_th: 0.1
+      max_neighbor_distance: 1.0
+      max_plane_residual: 0.2
+      point_filter_num: [1, 1, 1]
+      blind: 0.0
+      extrinsic_est_en: true
+      acc_cov: 0.011197412605492375
+      gyr_cov: 0.010270904839480961
+      b_acc_cov: 0.00011751767903346351
+      b_gyr_cov: 0.000091355383994881894
+      cov_threshold: 0.5
+      point_cov_max: 0.00125
+      point_cov_min: 0.00075
+      plane_cov_max: 1.0
+      plane_cov_min: 0.8
+      localize_cov_max: 2.0
+      localize_cov_min: 0.3
+      localize_thresh_max: 0.7
+      localize_thresh_min: 0.2
+
+    slam:
+      enabled: true
+      submap_voxel: 0.5
+      submap_distance: 10.0
+      min_range: 2.0
+      max_range: 100.0
+      graph_max_iterations: 30
+      lidar_position_sigma: 0.1
+      # Set loop_search_radius=0 to disable revisit proposals.
+      loop_search_radius: 15.0
+      loop_max_correction: 3.0
+      closure_overlap_threshold: 0.4
+      closure_max_rmse: 0.25
+      closure_fine_distance: 0.35
+      closure_min_time_separation: 30.0
+      closure_max_candidates: 3
+      no_of_sub_maps_to_skip: 3
+
+    gt:
+      enabled: true
+      align_initial: true
+      evaluate: true
+      file: /Users/grey.haus/Documents/InhouseBuild/CrossModal_Localization/Dataset/UrbanNavDataset/UrbanNav-HK-Medium-Urban-1/UrbanNav_TST_GT_raw.txt
+      gate_covariance: true
+      covariance_source: graph
+      # Covariance is in m^2; this raw GT has no measured covariance column.
+      # The matrix below is the explicit user assumption: sigma E/N/U=0.1/0.1/0.2m.
+      position_covariance: [0.01, 0.0, 0.0,
+                            0.0, 0.01, 0.0,
+                            0.0, 0.0, 0.04]
+      pose_covariance_threshold: 0.04
+      covariance_ratio: 1.0
+      min_factor_distance: 5.0
+      huber_delta: 3.0
+      # GT SPAN origin -> center HDL32: 0.14m + 0.28m in the body frame.
+      lidar_lever_arm: [0.0, 0.0, 0.42]
+
+    output:
+      directory: /Users/grey.haus/Documents/InhouseBuild/CrossModal_Localization/Test/SkyNet/Dataset/UrbanNav/Medium/Map/MA_SLAM
+      prefix: MA_SLAM_map
+      save_full: true
+      save_voxel: true
+      save_trajectory: true
+      interpolate_pose_corrections: true
+      voxel_size: 0.05
+      tile_size: 20.0
+      # Saving is explicit by default; existing comparison outputs are protected.
+      overwrite: false
+      save_on_shutdown: false
+
+    visualization:
+      preview_voxel: 0.5
+      preview_max_points: 200000
+      map_publish_every_submaps: 5
+
+    frames:
+      map: map
+      odom: odom
+      lidar: lidar_center

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="params_file" default="$(find-pkg-share ma_slam)/config/params.yaml"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="rviz" default="true"/>
+  <node pkg="ma_slam" exec="ma_slam_node" name="ma_slam" output="screen">
+    <param from="$(var params_file)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+  <node if="$(var rviz)" pkg="rviz2" exec="rviz2" name="ma_slam_rviz"
+        args="-d $(find-pkg-share ma_slam)/rviz/ma_slam.rviz" output="screen">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+</launch>

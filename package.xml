@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ma_slam</name>
+  <version>1.0.0</version>
+  <description>MA-LIO multi-LiDAR inertial frontend with a g2o pose graph, GT factors and dense XYZI mapping.</description>
+  <maintainer email="maintainer@example.com">MA-SLAM maintainers</maintainer>
+  <license>GPL-2.0</license>
+  <license>GPL-3.0-or-later</license>
+  <license>BSD-2-Clause</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_ros</depend>
+  <depend>pcl_conversions</depend>
+  <depend>eigen</depend>
+  <depend>libpcl-all-dev</depend>
+  <depend>boost</depend>
+  <build_depend>libomp-dev</build_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>launch_xml</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

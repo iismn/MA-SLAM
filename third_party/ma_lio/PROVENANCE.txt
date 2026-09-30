@@ -1,0 +1,38 @@
+MA-LIO numerical core
+Source: https://github.com/minwoo0611/MA-LIO
+Upstream commit: 8e4645f3c77e273cce0f098d270c3068570181c0
+
+The retained computational sources implement the authors' IMU initialization,
+B-spline point deskew, IESKF, planar residual/uncertainty and incremental k-d tree.
+MA-SLAM is a C++ ROS2 integration; it is not a Python estimator rewrite.
+See LICENSE and individual file headers for upstream and component notices.
+
+Files copied without numerical changes:
+BsplineSE3.cpp/.h, quat_ops.h, Exp_mat.h, so3_math.h, associate_uct.hpp,
+ikd-Tree and IKFoM support headers. associate_uct.hpp uses portable Eigen includes.
+BsplineSE3.cpp explicitly includes <cassert> for its existing assertions.
+
+Retained corrections from the previously validated native integration:
+- Initialize last IMU end time and last acceleration.
+- Include the first scan point in the deskew loop.
+- Drop points outside spline support and wait for full support before map seeding.
+- Permute all covariance blocks, including cross terms, with physical LiDAR IDs.
+- Resize correspondence arrays before writes; require three effective planes.
+- Calculate measurement covariance with fixed as well as estimated extrinsics.
+- Guard constant covariance ranges against division by zero.
+- Read the updated KF state before refreshing extrinsics and inserting map points.
+- Keep measured intensity independently of overloaded internal point intensity.
+- Export center-LiDAR covariance with attitude, lever-arm and cross terms.
+- Reject over 100000 registration points instead of overrunning upstream arrays.
+- Keep configurable neighbor/plane-residual gates at 1.0m / 0.2m by default.
+
+New integration-only changes:
+- Replace ROS1 message/time dependencies with measurementTypes.hpp records.
+- Select the original 2- or 3-LiDAR manifold with MA_SLAM_LIDAR_COUNT at compile time.
+- Move the prior adapter to src/imuPreintegration.cpp and original scan matching
+  into src/lidarOdometry.inc. Input/output are typed C++ records, without pybind.
+- The estimator retains upstream process-global state; use one instance per process.
+- ROS2 nodes own subscriptions, timestamp conversion, synchronization and publishing.
+
+No source generation, Python runtime, ROS1 compatibility headers, playback utility,
+figures, or custom sensor-message package is needed by this core.

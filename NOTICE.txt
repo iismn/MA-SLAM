@@ -1,0 +1,19 @@
+MA-SLAM retained source notices
+
+MA-LIO: https://github.com/minwoo0611/MA-LIO
+  The repository-level GPL v2 text is retained as LICENSE and
+  third_party/ma_lio/LICENSE. Individual computational files keep their own
+  copyright and license headers. This includes OpenVINS B-spline code with
+  GPL v3-or-later notices, IKFoM and ikd-Tree components.
+  Exact source revision and adaptations: third_party/ma_lio/PROVENANCE.txt.
+
+g2o: https://github.com/RainerKuemmerle/g2o
+  Source notices and BSD/GPL/LGPL texts are retained in third_party/g2o.
+  The MA-SLAM graph links core, slam3d types and the Eigen solver.
+  Optional applications, OpenGL, CHOLMOD, CSparse and other graph types are disabled.
+
+LIO-SAM: https://github.com/TixiaoShan/LIO-SAM/tree/ros2
+  Source organization reference only. No LIO-SAM library is linked.
+
+The ROS2 executable requires no RKO package, RKO-LIO frontend or Python pipeline.
+The optional notebook pybind adapter transports data to the same C++ core.

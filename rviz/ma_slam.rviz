@@ -1,0 +1,73 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: map
+    Frame Rate: 20
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Ground grid
+      Enabled: true
+      Cell Size: 10
+      Plane Cell Count: 100
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Optimized map preview
+      Enabled: true
+      Topic:
+        Value: /ma_slam/map
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Depth: 1
+      Color Transformer: Intensity
+      Channel Name: intensity
+      Position Transformer: XYZ
+      Style: Points
+      Size (Pixels): 2
+      Decay Time: 0
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Latest registered scan
+      Enabled: true
+      Topic:
+        Value: /ma_slam/cloud_registered
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+      Color Transformer: FlatColor
+      Color: 255; 190; 30
+      Position Transformer: XYZ
+      Style: Points
+      Size (Pixels): 2
+      Decay Time: 0
+    - Class: rviz_default_plugins/Path
+      Name: Optimized trajectory
+      Enabled: true
+      Topic:
+        Value: /ma_slam/path
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Depth: 1
+      Color: 40; 220; 255
+      Line Style: Lines
+      Line Width: 0.1
+      Buffer Length: 1
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Loop constraints
+      Enabled: true
+      Topic:
+        Value: /ma_slam/loop_constraints
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Depth: 1
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 100
+      Pitch: 0.8
+      Yaw: 0.6
+      Focal Point: {X: 0, Y: 0, Z: 0}

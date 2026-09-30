@@ -1,0 +1,13 @@
+# Local builds and generated outputs
+/build/
+/install/
+/log/
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+*.bag
+*.pcd
+*.npz
+*.db3
+*.mcap
