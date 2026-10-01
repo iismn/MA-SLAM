@@ -94,7 +94,7 @@ if(MA_SLAM_WITH_ROS2)
   endif()
   install(TARGETS ma_slam_node DESTINATION lib/${PROJECT_NAME})
   install(DIRECTORY config launch rviz DESTINATION share/${PROJECT_NAME})
-  install(FILES README.txt LICENSE NOTICE.txt DESTINATION share/${PROJECT_NAME})
+  install(FILES README.md LICENSE NOTICE.txt DESTINATION share/${PROJECT_NAME})
   install(FILES third_party/ma_lio/PROVENANCE.txt third_party/ma_lio/LICENSE
     DESTINATION share/${PROJECT_NAME}/licenses/ma_lio)
   install(FILES third_party/g2o/doc/license-bsd.txt third_party/g2o/doc/license-gpl.txt
