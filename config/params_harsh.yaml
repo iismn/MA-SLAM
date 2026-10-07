@@ -1,4 +1,4 @@
-# MA-SLAM ROS2 parameters for UrbanNav HK TST-20210517.
+# MA-SLAM ROS2 parameters for UrbanNav HK Mongkok-20210518 (Harsh).
 # Transforms map a LiDAR point into the physical SPAN IMU frame (row-major).
 # Sensor 0 is the center HDL32 and remains the graph/map reference LiDAR.
 # For a two-LiDAR build: sensors.count=2 and estimator.point_filter_num=[1, 1].
@@ -121,7 +121,7 @@
       enabled: true
       align_initial: true
       evaluate: true
-      file: /Users/grey.haus/Documents/InhouseBuild/CrossModal_Localization/Dataset/UrbanNavDataset/UrbanNav-HK-Medium-Urban-1/UrbanNav_TST_GT_raw.txt
+      file: /Users/grey.haus/Documents/InhouseBuild/CrossModal_Localization/Dataset/UrbanNavDataset/UrbanNav-HK-Harsh-Urban-1/UrbanNav_mongkok_GT_part_raw.txt
       gate_covariance: true
       covariance_source: graph
       # Covariance is in m^2; this raw GT has no measured covariance column.
@@ -143,7 +143,7 @@
       lidar_lever_arm: [0.0, 0.0, 0.42]
 
     output:
-      directory: /Users/grey.haus/Documents/InhouseBuild/CrossModal_Localization/Test/SkyNet/Dataset/UrbanNav/Medium/Map/MA_SLAM
+      directory: /Users/grey.haus/Documents/InhouseBuild/CrossModal_Localization/Test/SkyNet/Dataset/UrbanNav/Harsh/Map/MA_SLAM
       prefix: MA_SLAM_map
       save_full: true
       save_voxel: true

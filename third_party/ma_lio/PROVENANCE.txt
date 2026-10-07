@@ -25,6 +25,9 @@ Retained corrections from the previously validated native integration:
 - Export center-LiDAR covariance with attitude, lever-arm and cross terms.
 - Reject over 100000 registration points instead of overrunning upstream arrays.
 - Keep configurable neighbor/plane-residual gates at 1.0m / 0.2m by default.
+- Performance only (identical outputs): reuse the B-spline pose for consecutive deskew
+  points with an equal timestamp, and drop per-call omp_get_wtime() profiling in
+  BsplineSE3::get_pose (total_time was never read).
 
 New integration-only changes:
 - Replace ROS1 message/time dependencies with measurementTypes.hpp records.

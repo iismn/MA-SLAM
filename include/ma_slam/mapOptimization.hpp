@@ -32,6 +32,9 @@ struct GraphConfig {
     double gt_covariance_threshold = 0.04;
     double gt_covariance_ratio = 1.0;
     double gt_min_factor_distance = 5.0;
+    // A GT sample closer than gt_min_factor_distance is still accepted once this many seconds
+    // passed since the last GT factor (stops, degenerate stretches). 0 keeps the distance-only gate.
+    double gt_min_factor_interval = 0.0;
 };
 
 struct GraphStats {

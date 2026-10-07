@@ -213,6 +213,8 @@ Parameters readParameters(const ParameterGetter& get)
     graph.gt_covariance_threshold = real("gt.pose_covariance_threshold", graph.gt_covariance_threshold);
     graph.gt_covariance_ratio = real("gt.covariance_ratio", graph.gt_covariance_ratio);
     graph.gt_min_factor_distance = real("gt.min_factor_distance", graph.gt_min_factor_distance);
+    graph.gt_min_factor_interval = real("gt.min_factor_interval_seconds", graph.gt_min_factor_interval);
+    config.gt_max_quality = integer("gt.max_quality", config.gt_max_quality);
     config.gt_huber_delta = real("gt.huber_delta", 3);
     const auto covariance = std::get<std::vector<double>>(get("gt.position_covariance", std::vector<double>{.01, 0, 0, 0, .01, 0, 0, 0, .04}));
     require(covariance.size() == 9, "gt.position_covariance requires 9 row-major values in m^2");
@@ -227,6 +229,10 @@ Parameters readParameters(const ParameterGetter& get)
     require(graph.gt_covariance_threshold >= 0 && graph.gt_covariance_ratio > 0 &&
                 graph.gt_min_factor_distance >= 0 && config.gt_huber_delta > 0,
             "gt covariance gate, factor distance or Huber delta is invalid");
+    require(graph.gt_min_factor_interval >= 0 && graph.gt_min_factor_interval < 1e6,
+            "gt.min_factor_interval_seconds must be in [0, 1e6); 0 disables the time condition");
+    require(config.gt_max_quality >= 1 && config.gt_max_quality <= 6,
+            "gt.max_quality must be a SPAN quality in 1..6 (6 keeps every GT sample)");
     require(!graph.use_gt || config.slam_enabled, "gt.enabled requires slam.enabled");
     require(!(graph.use_gt || config.gt_align_initial || config.gt_evaluate) || !config.gt_file.empty(),
             "gt.file is required for factors, alignment or evaluation");
@@ -240,15 +246,36 @@ Parameters readParameters(const ParameterGetter& get)
     output.save_trajectory = flag("output.save_trajectory", true);
     output.overwrite = flag("output.overwrite", false);
     output.save_on_shutdown = flag("output.save_on_shutdown", false);
+    output.save_scans = flag("output.save_scans", false);
+    output.scans_directory = text("output.scans_directory", "Scans");
     output.voxel_size = real("output.voxel_size", .05);
     output.tile_size = real("output.tile_size", 20);
     require(!output.directory.empty(), "output.directory must not be empty");
+    require(!output.save_scans || (!output.scans_directory.empty() && output.scans_directory != "." && output.scans_directory != ".." &&
+                                  output.scans_directory.find_first_of("/\\") == std::string::npos),
+            "output.scans_directory must be a plain folder name");
     require(!output.prefix.empty() && output.prefix.find_first_of("/\\") == std::string::npos &&
                 output.prefix != "." && output.prefix != "..", "output.prefix must be a plain filename prefix");
     require(output.voxel_size > 0 && output.tile_size > 0, "output voxel_size and tile_size must be positive");
+    const auto excluded = std::get<std::vector<std::int64_t>>(get("output.exclude_sensors", std::vector<std::int64_t>{}));
+    config.map_exclude_sensors.clear();
+    for (const auto index : excluded) {
+        require(index >= 0 && index < count, "output.exclude_sensors entries must be sensor indices below sensors.count");
+        config.map_exclude_sensors.push_back(static_cast<int>(index));
+    }
+    std::sort(config.map_exclude_sensors.begin(), config.map_exclude_sensors.end());
+    config.map_exclude_sensors.erase(std::unique(config.map_exclude_sensors.begin(), config.map_exclude_sensors.end()),
+                                     config.map_exclude_sensors.end());
+    require(config.map_exclude_sensors.size() < static_cast<std::size_t>(count),
+            "output.exclude_sensors must keep at least one sensor in the map");
 
     config.preview_voxel = real("visualization.preview_voxel", .5);
     config.preview_max_points = positiveCount("visualization.preview_max_points", 200000);
+    config.local_preview_voxel = real("visualization.local_preview_voxel", config.local_preview_voxel);
+    config.local_preview_stride = positiveCount("visualization.local_preview_stride", 2);
+    config.local_preview_frames = positiveCount("visualization.local_preview_frames", 300);
+    config.local_preview_max_points = positiveCount("visualization.local_preview_max_points", 600000);
+    require(config.local_preview_voxel > 0, "visualization.local_preview_voxel must be positive");
     parameters.map_publish_every_submaps = positiveCount("visualization.map_publish_every_submaps", 5);
     require(config.preview_voxel > 0, "visualization.preview_voxel must be positive");
     parameters.frame_map = text("frames.map", "map");

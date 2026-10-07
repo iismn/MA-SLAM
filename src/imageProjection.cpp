@@ -157,19 +157,27 @@ StampedScan decode(const PointCloudView& view, int sensor_id, const SensorConfig
         double unwrapped = previous;
         const double first = previous;
         double turns = 0;
+        // Plausibility only: a ring with no returns over more than half a turn (e.g. the tilted
+        // LS-C16 in open scenes) makes the shortest-angle unwrap read that clockwise gap as a
+        // counter-clockwise jump, losing exactly one turn per gap. Point phases use only the
+        // fractional turn and are unaffected; the gap-aware count restores the ring count.
+        double gap_aware = 0;
         for (auto& point : result.scan.points) {
             const double angle = std::atan2(static_cast<double>(point.y), static_cast<double>(point.x));
             double step = angle - previous;
             if (step > pi) step -= 2 * pi;
             if (step < -pi) step += 2 * pi;
             unwrapped += step;
+            gap_aware += step > pi / 2 ? step - 2 * pi : step;
             previous = angle;
             turns = -(unwrapped - first) / (2 * pi);
             double phase = turns - std::floor(turns);
             if (phase > 1 - 1e-9) phase = 0;
             point.offset_seconds = std::llround(phase * duration_ns) * 1e-9;
         }
-        if (!(turns > 12.5 && turns < 16.3))
+        const double gap_aware_turns = -gap_aware / (2 * pi);
+        const auto ring_sweeps = [](double value) { return value > 12.5 && value < 16.3; };
+        if (!ring_sweeps(turns) && !ring_sweeps(gap_aware_turns))
             throw std::invalid_argument("LS-C16 ordered scan is not 13-16 ring sweeps; azimuth timing is unsafe.");
         result.timing_source = "estimated_azimuth_rings";
     }

@@ -99,6 +99,28 @@ void testDecoder() {
     require(ring_scan.timing_source == "estimated_azimuth_rings", "Estimated timing must be labelled.");
     rings.width = 50;
     rejects([&] { decode(rings, 2, inferred); });
+
+    // Partial rings (returns only over 170 deg, then a 190 deg clockwise gap to the next ring):
+    // the shortest-angle unwrap loses a turn per gap, but the scan is valid ring-major data and
+    // every point keeps its azimuth phase (offset = clockwise angle / 360 deg * duration).
+    constexpr std::size_t per_ring = 35;
+    constexpr double sector = 170. * 3.14159265358979323846 / 180.;
+    std::vector<std::uint8_t> partial_bytes(16 * per_ring * 16);
+    PointCloudView partial = rings;
+    partial.data = partial_bytes.data(); partial.size = partial_bytes.size(); partial.width = 16 * per_ring;
+    for (std::size_t i = 0; i < 16 * per_ring; ++i) {
+        const double angle = -static_cast<double>(i % per_ring) * sector / (per_ring - 1);
+        put(partial_bytes, i * 16, static_cast<float>(std::cos(angle)));
+        put(partial_bytes, i * 16 + 4, static_cast<float>(std::sin(angle)));
+        put(partial_bytes, i * 16 + 8, static_cast<float>(i / per_ring));
+        put(partial_bytes, i * 16 + 12, 12.f);
+    }
+    auto partial_scan = decode(partial, 2, inferred);
+    for (std::size_t i = 0; i < partial_scan.scan.points.size(); ++i) {
+        const double expected = .1 * static_cast<double>(i % per_ring) * (170. / 360.) / (per_ring - 1);
+        require(std::abs(partial_scan.scan.points[i].offset_seconds - expected) < 2e-6,
+                "Partial-ring LS-C16 azimuth phase changed.");
+    }
 }
 
 StampedScan scan(int sensor, std::int64_t begin, std::int64_t end) {

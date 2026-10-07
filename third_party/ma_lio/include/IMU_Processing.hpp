@@ -464,16 +464,44 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, esekfom::esekf<state_ikf
     }
       
     
-    auto it_pcl = feats_undistort_vec[num]->points.end();
-    for (; it_pcl != feats_undistort_vec[num]->points.begin();)
+    // MA-SLAM (performance only, identical outputs): evaluate the read-only B-spline pose of every
+    // point in parallel first; equal consecutive timestamps reuse one evaluation. The sequential
+    // loop below keeps the original order-dependent covariance bookkeeping unchanged.
+    auto &points = feats_undistort_vec[num]->points;
+    const long point_count = static_cast<long>(points.size());
+    std::vector<double> point_times(point_count);
+    for (long i = 0; i < point_count; ++i)
+      point_times[i] = points[i].curvature / double(1000) + meas.lidar_beg_time[lid_num - num - 1];
+    std::vector<V3D> point_trans(point_count, V3D::Zero());
+    std::vector<Eigen::Quaterniond> point_quat(point_count, Eigen::Quaterniond::Identity());
+    std::vector<char> point_ok(point_count, 0);
+    #ifdef MP_EN
+    #pragma omp parallel for num_threads(MP_PROC_NUM) schedule(dynamic, 256)
+    #endif
+    for (long i = 0; i < point_count; ++i)
+    {
+      if (i > 0 && point_times[i] == point_times[i - 1])
+        continue;
+      point_ok[i] = spline_traj->get_pose(point_times[i], point_quat[i], point_trans[i]); // point pose
+    }
+    for (long i = 1; i < point_count; ++i)
+      if (point_times[i] == point_times[i - 1])
+      {
+        point_ok[i] = point_ok[i - 1];
+        point_quat[i] = point_quat[i - 1];
+        point_trans[i] = point_trans[i - 1];
+      }
+    auto it_pcl = points.end();
+    for (; it_pcl != points.begin();)
       {
         --it_pcl;
-        V3D pt_imu_frame_trans;
-        Eigen::Quaterniond pt_imu_frame_quat;
         Pose pt_imu_frame;
+        const long point_index = it_pcl - points.begin();
 
-        double point_t = it_pcl->curvature / double(1000) + meas.lidar_beg_time[lid_num - num - 1];
-        spline_flag = spline_traj->get_pose(point_t, pt_imu_frame_quat, pt_imu_frame_trans); // point pose
+        double point_t = point_times[point_index];
+        spline_flag = point_ok[point_index];
+        V3D pt_imu_frame_trans = point_trans[point_index];
+        Eigen::Quaterniond pt_imu_frame_quat = point_quat[point_index];
         if (!spline_flag) { it_pcl->normal_x = -1; continue; }
         if (imu_cov[cov_pointer].first.first > point_t)
         {

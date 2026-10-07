@@ -221,28 +221,11 @@ Existing outputs are protected by `output.overwrite: false`. Ctrl-C does not sav
 
 The TF chain is `map → odom → lidar_center`. `map` is ENU when GT initial alignment is enabled; `odom` is the local frontend frame. Preview sampling does not reduce the saved full map.
 
-## 5. Optional Notebook Adapter
+## 5. Notebook Adapter (separate directory)
 
-`MA_SLAM_WITH_PYTHON=ON` builds the optional `src/notebookBindings.cpp` adapter to the same C++ pipeline. It is off by default and does not replace the estimator with Python.
+This package is the ROS 2 runtime: launch the node, receive topics, and process them with the C++ core. It contains no Python or pybind build.
 
-The existing **SkyNet workspace**, outside this repository, provides:
-
-```text
-Utils/GenCode/Notebook/runBuildMASLAMMap.ipynb
-Utils/GenCode/Notebook/Utils/maslam_runner.py
-```
-
-These files are **not included in this standalone repository**. In that workspace, the helper handles ROS 1 bag reading, native build, and notebook progress in one Python file. No ROS 2 installation or whole-bag conversion is needed for that offline path.
-
-Use the InhouseBuild environment for its dependencies:
-
-```bash
-source ~/Documents/InhouseBuild/.venv/bin/activate
-uv pip install --python "$VIRTUAL_ENV/bin/python" \
-  numpy pyyaml rosbags cmake pybind11 tqdm matplotlib
-```
-
-Run the notebook cells in order. `CONFIG` selects the shared YAML; `OVERRIDES` changes individual keys. For a short comparison use `MAX_BATCHES=100` and `SAVE_MAP=False`. `MAX_BATCHES=0` processes the full sequence; `DRY_RUN=True` builds and checks inputs. The notebook's save switch is independent of the ROS 2 shutdown setting.
+Offline notebook runs use the sibling **`../MA_SLAM_ADAPTER`** directory. Its CMake project adds this directory with `MA_SLAM_WITH_ROS2=OFF` and links the same `ma_slam_pipeline` library into a pybind module. Estimator, graph, and export changes therefore apply to both the ROS 2 node and the notebook. See `../MA_SLAM_ADAPTER/README.md`.
 
 ## 6. Code Structure
 
@@ -261,8 +244,7 @@ MA-SLAM/
 │   ├── mapOptimization.cpp     # g2o graph, loop verification, GT factors
 │   ├── groundTruth.cpp         # GT conversion, lever arm, interpolation, ATE
 │   ├── mapStorage.cpp          # Dense storage and corrected XYZI export
-│   ├── parameters.cpp          # Shared parameter parsing and validation
-│   └── notebookBindings.cpp    # Optional native Python binding
+│   └── parameters.cpp          # Shared parameter parsing and validation
 ├── tests/                     # Native regressions and ROS 2 service smoke test
 └── third_party/
     ├── ma_lio/                # Retained upstream numerical components

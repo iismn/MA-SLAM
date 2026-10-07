@@ -83,7 +83,7 @@ void BsplineSE3::feed_trajectory(std::vector<Eigen::VectorXd> traj_points) {
 }
 
 bool BsplineSE3::get_pose(double timestamp, Eigen::Quaterniond &q_GtoI, Eigen::Vector3d &p_IinG) {
-  time_feed = omp_get_wtime();
+  // MA-SLAM: per-call wall-clock profiling removed (called per point; total_time was never read).
   // Get the bounding poses for the desired timestamp
   double t0, t1, t2, t3;
   Eigen::Matrix4d pose0, pose1, pose2, pose3;
@@ -113,7 +113,6 @@ bool BsplineSE3::get_pose(double timestamp, Eigen::Quaterniond &q_GtoI, Eigen::V
   R_GtoI = pose_interp.block(0, 0, 3, 3);
   q_GtoI = R_GtoI;
   p_IinG = pose_interp.block(0, 3, 3, 1);
-  total_time += (omp_get_wtime() - time_feed);
 
   return true;
 }

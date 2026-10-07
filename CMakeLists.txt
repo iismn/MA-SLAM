@@ -8,10 +8,18 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 option(MA_SLAM_WITH_ROS2 "Build the ROS 2 ament package" ON)
-option(MA_SLAM_WITH_PYTHON "Build the optional notebook adapter to the C++ core" OFF)
+# The notebook pybind adapter lives in ../MA_SLAM_ADAPTER and links ma_slam_pipeline from here.
 set(MA_SLAM_LIDAR_COUNT 3 CACHE STRING "MA-LIO manifold sensor count: 2 or 3")
 if(NOT MA_SLAM_LIDAR_COUNT MATCHES "^[23]$")
   message(FATAL_ERROR "MA_SLAM_LIDAR_COUNT must be 2 or 3")
+endif()
+# OpenMP threads for per-point frontend loops; outputs are bit-identical for any count >= 2.
+# 1 is rejected: omp_set_num_threads(MP_PROC_NUM) also drives Eigen's OpenMP GEMM
+# (HTH = HT * h_x_, esekfom.hpp), which runs serially at 1 thread with a different depth
+# blocking (kc) and would change IEKF results bitwise.
+set(MA_SLAM_OMP_THREADS 6 CACHE STRING "OpenMP threads for MA-LIO per-point loops (>= 2)")
+if(NOT MA_SLAM_OMP_THREADS MATCHES "^([2-9]|[1-9][0-9]+)$")
+  message(FATAL_ERROR "MA_SLAM_OMP_THREADS must be an integer >= 2")
 endif()
 
 find_package(Eigen3 REQUIRED)
@@ -48,7 +56,9 @@ target_compile_definitions(ma_slam_common INTERFACE MA_SLAM_LIDAR_COUNT=${MA_SLA
 add_library(ma_slam_frontend src/imuPreintegration.cpp
   third_party/ma_lio/src/BsplineSE3.cpp third_party/ma_lio/include/ikd-Tree/ikd_Tree.cpp)
 target_include_directories(ma_slam_frontend PRIVATE third_party/ma_lio/include)
-target_compile_definitions(ma_slam_frontend PRIVATE MP_EN MP_PROC_NUM=4)
+# Deterministic ikd-tree rebuild: identical results independent of thread scheduling (see ikd_Tree.cpp).
+target_compile_definitions(ma_slam_frontend PRIVATE MP_EN MP_PROC_NUM=${MA_SLAM_OMP_THREADS}
+  MA_SLAM_DETERMINISTIC_REBUILD)
 target_link_libraries(ma_slam_frontend PUBLIC ma_slam_common PRIVATE OpenMP::OpenMP_CXX)
 
 add_library(ma_slam_graph src/mapOptimization.cpp)
@@ -60,13 +70,6 @@ add_library(ma_slam_storage src/mapStorage.cpp)
 target_link_libraries(ma_slam_storage PUBLIC ma_slam_common)
 add_library(ma_slam_pipeline src/pipeline.cpp src/parameters.cpp)
 target_link_libraries(ma_slam_pipeline PUBLIC ma_slam_frontend ma_slam_graph ma_slam_input ma_slam_storage)
-
-if(MA_SLAM_WITH_PYTHON)
-  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
-  find_package(pybind11 CONFIG REQUIRED)
-  pybind11_add_module(_ma_slam_native MODULE src/notebookBindings.cpp)
-  target_link_libraries(_ma_slam_native PRIVATE ma_slam_pipeline)
-endif()
 
 include(CTest)
 if(BUILD_TESTING)

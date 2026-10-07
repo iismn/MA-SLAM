@@ -63,7 +63,7 @@ int main() {
         {
             std::ofstream gt(gt_path);
             gt << "UrbanNav GT\n20 columns\n"
-               << "1000 0 0 0 0 0 0 0 0 10 0 0 0 0 0 0 0 0 -30 2\n"
+               << "1000.65 0 0 0 0 0 0 0 0 10 0 0 0 0 0 0 0 0 -30 2\n"
                << "1002 0 0 0 0 0 0 0 0 10 0 0 0 0 0 0 0 0 -30 2\n";
         }
         const int count = ImuPreintegration::lidarCount();
@@ -106,10 +106,13 @@ int main() {
             }
         }
         constexpr std::int64_t epoch = 1000000000000LL;
+        // Partial GT starts after the bag and after motion begins (yaw from 0.5 s):
+        // the frontend must initialize at the static bag start, while poses before GT stay unregistered.
+        constexpr std::int64_t gt_start = epoch + 650000000LL;
         std::vector<PipelineUpdate> updates;
         Matrix4 alignment = Matrix4::Identity();
         double previous = 0;
-        for (int batch_index = 0; batch_index < 12; ++batch_index) {
+        for (int batch_index = 0; batch_index < 16; ++batch_index) {
             SynchronizedBatch batch;
             batch.start_ns = std::numeric_limits<std::int64_t>::max();
             double end_seconds = 0;
@@ -145,9 +148,16 @@ int main() {
             }
             previous = end_seconds;
             auto update = pipeline.process(batch);
-            if (!update) continue;
+            if (!update) {
+                require(updates.empty(), "A registered frame was dropped after GT coverage began.");
+                continue;
+            }
             require(update->map_pose.allFinite() && update->odom_pose.allFinite(), "Pipeline returned non-finite pose.");
             if (updates.empty()) {
+                require(update->stamp_ns >= gt_start, "A pre-GT pose was registered.");
+                const double yaw = std::atan2(update->odom_pose(1, 0), update->odom_pose(0, 0));
+                require(std::abs(yaw) > .03,
+                        "Frontend was not initialized before GT coverage (odom frame starts at GT).");
                 const auto reference = *GroundTruth::load(gt_path.string()).poseAt(update->stamp_ns);
                 require(update->map_pose.isApprox(reference, 1e-9), "GT initial orientation/center-LiDAR alignment changed.");
                 alignment = update->map_pose * update->odom_pose.inverse();

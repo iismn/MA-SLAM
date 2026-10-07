@@ -1,4 +1,5 @@
 #include "ma_slam/mapStorage.hpp"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -134,6 +135,76 @@ void checkPCDAndPublication(const std::filesystem::path& root) {
             "A preexisting symlink was overwritten or a partial result was published.");
 }
 
+std::vector<std::array<float, 4>> readRecords(const std::filesystem::path& file) {
+    std::ifstream stream(file, std::ios::binary | std::ios::ate);
+    require(stream.good(), "Cannot open scan archive.");
+    const auto bytes = static_cast<std::size_t>(stream.tellg());
+    require(bytes % sizeof(std::array<float, 4>) == 0, "Scan archive is not whole XYZI records.");
+    std::vector<std::array<float, 4>> records(bytes / sizeof(records[0]));
+    stream.seekg(0);
+    stream.read(reinterpret_cast<char*>(records.data()), bytes);
+    return records;
+}
+
+void checkScanArchive(const std::filesystem::path& root) {
+    // - save_scans keeps the exact sensor-frame records (not world points) and reports per-record counts.
+    // - An empty record stays in the count list so counts line up with the pose list.
+    ma_slam::MapStorage storage;
+    const auto first = cloud({{.5f, 1.f, 2.f, 11.f}, {3.f, 4.f, 5.f, 22.f}, {6.f, 7.f, 8.f, 33.f}});
+    const auto last = cloud({{-1.f, -2.f, -3.f, 44.f}, {9.f, 8.f, 7.f, 55.f}});
+    storage.append(first);
+    storage.append(cloud({}));
+    storage.append(last);
+    ma_slam::OutputConfig config;
+    config.directory = (root / "scans").string();
+    config.save_scans = true;
+    std::vector<ma_slam::Matrix4> poses(3, ma_slam::Matrix4::Identity());
+    poses[0](0, 3) = 100.; poses[1](0, 3) = 101.; poses[2](0, 3) = 102.;
+    const std::vector<std::int64_t> times = {10, 20, 30};
+    const auto saved = storage.save(config, times, poses);
+    require(saved.scan_counts == std::vector<std::uint64_t>({3, 0, 2}), "Scan counts are wrong.");
+    const auto archive = root / "scans/Scans/scans.xyzi";
+    const auto records = readRecords(archive);
+    require(records.size() == 5, "Scan archive has the wrong number of records.");
+    for (std::size_t i = 0; i < 3; ++i)
+        require(records[i] == std::array<float, 4>({first[i].x, first[i].y, first[i].z, first[i].intensity}),
+                "Scan archive changed the first scan or moved it into the map frame.");
+    for (std::size_t i = 0; i < 2; ++i)
+        require(records[3 + i] == std::array<float, 4>({last[i].x, last[i].y, last[i].z, last[i].intensity}),
+                "Scan archive changed the last scan or moved it into the map frame.");
+    const auto full = readPCD(root / "scans/MA_SLAM_map_Full.pcd");
+    require(full.size() == 5 && std::abs(full[0][0] - 100.5f) < 1e-4f, "Full map is not in the pose frame.");
+    require(std::find(saved.files.begin(), saved.files.end(), archive) != saved.files.end(),
+            "Saved file list omits the scan archive.");
+    for (const auto& item : std::filesystem::directory_iterator(root / "scans"))
+        require(item.path().filename().string().rfind("ma_slam-", 0) != 0, "Staging directory was left behind.");
+
+    // A second save would need a scan spool that was already moved out.
+    // Overwrite protection: a different storage must not replace an existing archive.
+    ma_slam::MapStorage other;
+    other.append(first);
+    ma_slam::OutputConfig again = config;
+    std::vector<ma_slam::Matrix4> one(1, ma_slam::Matrix4::Identity());
+    const std::vector<std::int64_t> one_time = {10};
+    const auto before = readText(archive);
+    bool refused = false;
+    try { other.save(again, one_time, one); } catch (const std::runtime_error&) { refused = true; }
+    require(refused && readText(archive) == before, "Existing scan archive was replaced without overwrite permission.");
+    again.overwrite = true;
+    other.save(again, one_time, one);
+    require(readRecords(archive).size() == 3, "Explicit overwrite did not replace the scan archive.");
+
+    ma_slam::MapStorage rejected_storage;
+    rejected_storage.append(first);
+    ma_slam::OutputConfig invalid = config;
+    invalid.directory = (root / "scans-invalid").string();
+    invalid.scans_directory = "../escape";
+    bool rejected = false;
+    try { rejected_storage.save(invalid, one_time, one); } catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && !std::filesystem::exists(root / "escape") && !std::filesystem::exists(invalid.directory),
+            "A scans_directory outside the output folder was accepted.");
+}
+
 void checkGlobalVoxels(const std::filesystem::path& root) {
     ma_slam::MapStorage storage;
     // 1/(1/93) rounds just below 93. These two distinct float32 values share
@@ -211,9 +282,10 @@ int main() {
         TestDirectory directory;
         checkPCDAndPublication(directory.path);
         checkGlobalVoxels(directory.path);
+        checkScanArchive(directory.path);
         checkInterpolation();
         std::cout << "PASS: full XYZI, voxel centroid/intensity, global tile boundaries, exact timestamps, "
-                     "no-overwrite/staging and SE(3) interpolation.\n";
+                     "no-overwrite/staging, scan archive export and SE(3) interpolation.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';

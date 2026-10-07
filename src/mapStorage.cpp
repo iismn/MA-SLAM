@@ -107,6 +107,9 @@ SavedMap MapStorage::save(const OutputConfig& config, const std::vector<std::int
         !std::isfinite(config.voxel_size) || config.voxel_size <= 0 ||
         !std::isfinite(config.tile_size) || config.tile_size <= 0)
         throw std::invalid_argument("Invalid output directory/prefix/voxel settings.");
+    if (config.save_scans && (config.scans_directory.empty() || config.scans_directory == "." || config.scans_directory == ".." ||
+        std::filesystem::path(config.scans_directory).filename() != config.scans_directory))
+        throw std::invalid_argument("output.scans_directory must be a plain folder name.");
     const double tile_voxels = std::max(1., std::ceil(config.tile_size / config.voxel_size));
     if (!std::isfinite(tile_voxels) || tile_voxels >= double(std::numeric_limits<std::int64_t>::max()))
         throw std::invalid_argument("Output tile contains too many voxel indices.");
@@ -120,9 +123,11 @@ SavedMap MapStorage::save(const OutputConfig& config, const std::vector<std::int
     if (config.save_full) result.files.push_back(output / (config.prefix + "_Full.pcd"));
     if (config.save_voxel) result.files.push_back(output / (config.prefix + ".pcd"));
     if (config.save_trajectory) result.files.push_back(output / (config.prefix + "_trajectory.tum"));
+    if (config.save_scans) result.files.push_back(output / config.scans_directory / "scans.xyzi");
     for (const auto& file : result.files)
         if (!config.overwrite && std::filesystem::symlink_status(file).type() != std::filesystem::file_type::not_found)
             throw std::runtime_error("Output exists; set output.overwrite explicitly: " + file.string());
+    if (config.save_scans) std::filesystem::create_directories(output / config.scans_directory);
     TemporaryDirectory stage(output);
     stream_.flush();
     std::ifstream source(folder_ / "scans.xyzi", std::ios::binary);
@@ -161,6 +166,18 @@ SavedMap MapStorage::save(const OutputConfig& config, const std::vector<std::int
             stream.exceptions(std::ios::failbit | std::ios::badbit);
             stream.write(reinterpret_cast<const char*>(records.data()), records.size() * sizeof(Record));
         }
+    }
+    if (config.save_scans) {
+        // - The spool already holds the exact scans: move it (no extra disk copy) once it has been read.
+        // - Different filesystems cannot rename; then copy and let the destructor drop the original.
+        source.close();
+        const auto spool = folder_ / "scans.xyzi";
+        const auto staged = stage.path / "scans.xyzi";
+        try { std::filesystem::rename(spool, staged); }
+        catch (const std::filesystem::filesystem_error&) { std::filesystem::copy_file(spool, staged); }
+        if (std::filesystem::file_size(staged) != total * sizeof(Record))
+            throw std::runtime_error("Scan archive size does not match the stored scan counts.");
+        result.scan_counts = counts_;
     }
     if (config.save_full) { full.close(); result.full_points = total; }
     if (config.save_voxel) {

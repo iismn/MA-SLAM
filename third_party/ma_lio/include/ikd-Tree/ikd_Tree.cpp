@@ -689,6 +689,23 @@ void KD_TREE<PointType>::acquire_removed_points(PointVector &removed_points)
 template <typename PointType>
 void KD_TREE<PointType>::BuildTree(KD_TREE_NODE **root, int l, int r, PointVector &Storage)
 {
+    // MA-SLAM (performance only, identical tree): sibling subtrees own disjoint Storage ranges,
+    // so large ones are built as OpenMP tasks. Every node is computed exactly as upstream.
+#ifdef MP_EN
+    if (r - l + 1 >= MA_SLAM_PARALLEL_BUILD_MIN_POINTS && !omp_in_parallel())
+    {
+        #pragma omp parallel num_threads(MP_PROC_NUM)
+        #pragma omp single
+        BuildTreeNode(root, l, r, Storage, true);
+        return;
+    }
+#endif
+    BuildTreeNode(root, l, r, Storage, false);
+}
+
+template <typename PointType>
+void KD_TREE<PointType>::BuildTreeNode(KD_TREE_NODE **root, int l, int r, PointVector &Storage, bool spawn)
+{
     if (l > r)
         return;
     *root = new KD_TREE_NODE;
@@ -735,8 +752,20 @@ void KD_TREE<PointType>::BuildTree(KD_TREE_NODE **root, int l, int r, PointVecto
     }
     (*root)->point = Storage[mid];
     KD_TREE_NODE *left_son = nullptr, *right_son = nullptr;
-    BuildTree(&left_son, l, mid - 1, Storage);
-    BuildTree(&right_son, mid + 1, r, Storage);
+#ifdef MP_EN
+    if (spawn && r - l + 1 >= MA_SLAM_PARALLEL_BUILD_MIN_POINTS)
+    {
+        #pragma omp task shared(left_son, Storage)
+        BuildTreeNode(&left_son, l, mid - 1, Storage, true);
+        BuildTreeNode(&right_son, mid + 1, r, Storage, true);
+        #pragma omp taskwait
+    }
+    else
+#endif
+    {
+        BuildTreeNode(&left_son, l, mid - 1, Storage, false);
+        BuildTreeNode(&right_son, mid + 1, r, Storage, false);
+    }
     (*root)->left_son_ptr = left_son;
     (*root)->right_son_ptr = right_son;
     Update((*root));
@@ -747,6 +776,10 @@ template <typename PointType>
 void KD_TREE<PointType>::Rebuild(KD_TREE_NODE **root)
 {
     KD_TREE_NODE *father_ptr;
+    // MA-SLAM: with MA_SLAM_DETERMINISTIC_REBUILD every rebuild runs synchronously below.
+    // The background swap time otherwise depends on thread scheduling, which changes
+    // nearest-neighbour/downsample tie-breaking and makes SLAM results run-dependent.
+#ifndef MA_SLAM_DETERMINISTIC_REBUILD
     if ((*root)->TreeSize >= Multi_Thread_Rebuild_Point_Num)
     {
         if (!pthread_mutex_trylock(&rebuild_ptr_mutex_lock))
@@ -759,6 +792,7 @@ void KD_TREE<PointType>::Rebuild(KD_TREE_NODE **root)
         }
     }
     else
+#endif
     {
         father_ptr = (*root)->father_ptr;
         int size_rec = (*root)->TreeSize;

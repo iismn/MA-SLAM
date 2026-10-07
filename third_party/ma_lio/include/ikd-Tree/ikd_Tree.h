@@ -16,6 +16,11 @@
 #define DOWNSAMPLE_SWITCH true
 #define ForceRebuildPercentage 0.2
 #define Q_LEN 1000000
+// MA-SLAM: subtrees at least this large are built as parallel OpenMP tasks (identical tree).
+#define MA_SLAM_PARALLEL_BUILD_MIN_POINTS 4096
+#ifdef MP_EN
+#include <omp.h>
+#endif
 
 using namespace std;
 
@@ -285,6 +290,7 @@ private:
     void InitTreeNode(KD_TREE_NODE *root);
     void Test_Lock_States(KD_TREE_NODE *root);
     void BuildTree(KD_TREE_NODE **root, int l, int r, PointVector &Storage);
+    void BuildTreeNode(KD_TREE_NODE **root, int l, int r, PointVector &Storage, bool spawn);
     void Rebuild(KD_TREE_NODE **root);
     int Delete_by_range(KD_TREE_NODE **root, BoxPointType boxpoint, bool allow_rebuild, bool is_downsample);
     void Delete_by_point(KD_TREE_NODE **root, PointType point, bool allow_rebuild);

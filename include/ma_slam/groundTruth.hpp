@@ -22,11 +22,14 @@ public:
                       const std::vector<Matrix4>& poses_enu) const;
     const std::vector<std::int64_t>& timesNs() const { return times_; }
     const std::vector<Eigen::Vector3d>& positions() const { return positions_; }
+    // SPAN solution quality Q (last GT column): 1 best .. 6 worst.
+    const std::vector<int>& qualities() const { return qualities_; }
     static std::string report(const AteStats& stats, bool gt_used_in_optimization);
 
 private:
     std::vector<std::int64_t> times_;
     std::vector<Eigen::Vector3d> positions_;
+    std::vector<int> qualities_;
     std::vector<Eigen::Quaterniond> orientations_;
 };
 

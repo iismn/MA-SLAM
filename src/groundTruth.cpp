@@ -93,6 +93,7 @@ GroundTruth GroundTruth::load(const std::string& path, const Eigen::Vector3d& li
         result.positions_.push_back(basis * (point - origin) + rotation * lidar_lever_arm);
         result.orientations_.emplace_back(rotation);
         result.orientations_.back().normalize();
+        result.qualities_.push_back(static_cast<int>(std::lround(values[19])));
     }
     if (result.times_.size() < 2) throw std::runtime_error("GT trajectory needs at least two records.");
     return result;

@@ -253,7 +253,9 @@ void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_
     /*** Utilize the local planarity ***/
     #ifdef MP_EN
         omp_set_num_threads(MP_PROC_NUM);
-    #pragma omp parallel for
+    // Iterations are independent (per-index writes only): dynamic chunks balance mixed
+    // performance/efficiency cores without changing any result.
+    #pragma omp parallel for schedule(dynamic, 64)
     #endif
     for (int i = 0; i < feats_down_size; i++)
     {

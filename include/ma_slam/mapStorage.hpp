@@ -12,10 +12,15 @@ struct OutputConfig {
     bool save_full = true, save_voxel = true, save_trajectory = true;
     bool overwrite = false, save_on_shutdown = false;
     double voxel_size = .05, tile_size = 20.;
+    // Keep the exact deskewed XYZI scans (sensor frame, one record per pose) in <directory>/<scans_directory>/scans.xyzi
+    // for downstream tools such as ERASOR2. The scan spool is moved there, so it costs no extra disk copy.
+    bool save_scans = false;
+    std::string scans_directory = "Scans";
 };
 
 struct SavedMap {
     std::uint64_t full_points = 0, voxel_points = 0;
+    std::vector<std::uint64_t> scan_counts;  // points per stored scan record; filled when save_scans is set
     std::vector<std::filesystem::path> files;
 };
 

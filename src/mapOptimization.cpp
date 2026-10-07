@@ -63,20 +63,23 @@ public:
           iterations_(c.graph_max_iterations), gt_enabled_(c.use_gt),
           gate_covariance_(c.gt_gate_covariance), graph_covariance_(c.gt_gate_graph_covariance),
           covariance_threshold_(c.gt_covariance_threshold), covariance_ratio_(c.gt_covariance_ratio),
-          min_gt_distance_(c.gt_min_factor_distance), closure_kernel_delta_(1. / c.lidar_position_sigma),
+          min_gt_distance_(c.gt_min_factor_distance),
+          min_gt_interval_ns_(static_cast<std::int64_t>(std::llround(c.gt_min_factor_interval * 1e9))),
+          closure_kernel_delta_(1. / c.lidar_position_sigma),
           odom_information_(1. / (c.lidar_position_sigma * c.lidar_position_sigma)) {
         const double values[] = {c.submap_voxel, c.submap_distance, c.min_range, c.max_range,
             c.lidar_position_sigma, c.loop_search_radius, c.loop_max_correction,
             c.closure_overlap_threshold, c.closure_max_rmse, c.closure_fine_distance,
             c.closure_min_time_separation, c.gt_covariance_threshold, c.gt_covariance_ratio,
-            c.gt_min_factor_distance};
+            c.gt_min_factor_distance, c.gt_min_factor_interval};
         if (!std::all_of(std::begin(values), std::end(values), [](double v) { return std::isfinite(v); }) ||
             !(voxel_ > 0 && split_ > 0 && max_range_ > min_range_ && min_range_ >= 0 &&
               c.lidar_position_sigma > 0 && fine_distance_ > 0 && iterations_ > 0 &&
               max_candidates_ > 0 && skip_submaps_ > 0 && loop_radius_ >= 0 &&
               max_correction_ > 0 && overlap_threshold_ > 0 && overlap_threshold_ <= 1 &&
               max_rmse_ > 0 && loop_time_ >= 0 && covariance_threshold_ >= 0 &&
-              covariance_ratio_ >= 0 && min_gt_distance_ >= 0))
+              covariance_ratio_ >= 0 && min_gt_distance_ >= 0 && c.gt_min_factor_interval >= 0 &&
+              c.gt_min_factor_interval < 1e6))
             throw std::invalid_argument("Invalid MA-SLAM graph settings.");
         using Solver = g2o::BlockSolverX;
         auto linear = std::make_unique<g2o::LinearSolverEigen<Solver::PoseMatrixType>>();
@@ -333,7 +336,8 @@ private:
                     ++skipped_covariance_; ++gt_cursor_; continue;
                 }
                 if (!accepted_gt_times_.empty() &&
-                    (measurement - last_gt_position_).norm() < min_gt_distance_) {
+                    (measurement - last_gt_position_).norm() < min_gt_distance_ &&
+                    (min_gt_interval_ns_ == 0 || time - accepted_gt_times_.back() < min_gt_interval_ns_)) {
                     ++skipped_distance_; ++gt_cursor_; continue;
                 }
             }
@@ -458,7 +462,9 @@ private:
     float overlap_threshold_, max_rmse_, fine_distance_, loop_time_;
     int max_candidates_, skip_submaps_, iterations_;
     bool gt_enabled_, gate_covariance_, graph_covariance_, gt_ready_ = false, finalized_ = false;
-    double covariance_threshold_, covariance_ratio_, min_gt_distance_, closure_kernel_delta_, odom_information_, huber_ = 3.;
+    double covariance_threshold_, covariance_ratio_, min_gt_distance_;
+    std::int64_t min_gt_interval_ns_;
+    double closure_kernel_delta_, odom_information_, huber_ = 3.;
     std::vector<std::int64_t> gt_times_, accepted_gt_times_;
     Eigen::MatrixXd gt_positions_;
     Eigen::Matrix3d gt_covariance_;

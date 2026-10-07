@@ -16,4 +16,4 @@ LIO-SAM: https://github.com/TixiaoShan/LIO-SAM/tree/ros2
   Source organization reference only. No LIO-SAM library is linked.
 
 The ROS2 executable requires no RKO package, RKO-LIO frontend or Python pipeline.
-The optional notebook pybind adapter transports data to the same C++ core.
+The notebook pybind adapter is a separate directory (../MA_SLAM_ADAPTER) that links the same C++ core.
